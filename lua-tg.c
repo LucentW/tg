@@ -1411,7 +1411,7 @@ void lua_do_all (void) {
       tgl_do_msg_search (TLS, tgl_set_peer_id (TGL_PEER_UNKNOWN, 0), 0, 0, 40, 0, LUA_STR_ARG (p + 1), lua_msg_list_cb, lua_ptr[p].ptr);
       p += 2;
       break;
-	  case lq_resolve_username:
+    case lq_resolve_username:
       tgl_do_contact_search (TLS, LUA_STR_ARG (p + 1), lua_contact_search_cb, lua_ptr[p].ptr);
       p += 2;
       break;
@@ -1425,6 +1425,10 @@ void lua_do_all (void) {
       break;
     case lq_set_profile_name:
       tgl_do_set_profile_name (TLS, LUA_STR_ARG (p + 1), LUA_STR_ARG (p + 2), lua_user_cb, lua_ptr[p].ptr);
+      p += 3;
+      break;
+    case lq_set_profile_username:
+      tgl_do_set_username (TLS, LUA_STR_ARG (p + 1), lua_user_cb, lua_ptr[p].ptr);
       p += 3;
       break;
     case lq_create_secret_chat:
