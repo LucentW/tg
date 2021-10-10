@@ -118,7 +118,7 @@ json_t *json_pack_peer (tgl_peer_id_t id) {
   assert (json_object_set (res, "peer_id", json_integer (tgl_get_peer_id (id))) >= 0);
 
   assert (res);
-
+    
   if (!P || !(P->flags & TGLPF_CREATED)) {
     static char s[100];
     switch (tgl_get_peer_type (id)) {
@@ -137,7 +137,7 @@ json_t *json_pack_peer (tgl_peer_id_t id) {
     default:
       assert (0);
     }
-
+    
     assert (json_object_set (res, "print_name", json_string (s)) >= 0);
     return res;
   }
@@ -147,7 +147,7 @@ json_t *json_pack_peer (tgl_peer_id_t id) {
     assert (json_object_set (res, "print_name", json_string ("")) >= 0);
   }
   assert (json_object_set (res, "flags", json_integer (P->flags)) >= 0);
-
+  
   switch (tgl_get_peer_type (id)) {
   case TGL_PEER_USER:
     json_pack_user (res, P);
@@ -169,13 +169,13 @@ json_t *json_pack_peer (tgl_peer_id_t id) {
 
 json_t *json_pack_updates (unsigned flags) {
   json_t *a = json_array ();
-
+  
   if (flags & TGL_UPDATE_CREATED) {
     assert (json_array_append (a, json_string ("created")) >= 0);
-  }
+  }  
   if (flags & TGL_UPDATE_DELETED) {
     assert (json_array_append (a, json_string ("deleted")) >= 0);
-  }
+  }  
   if (flags & TGL_UPDATE_PHONE) {
     assert (json_array_append (a, json_string ("phone")) >= 0);
   }
@@ -393,7 +393,7 @@ json_t *json_pack_service (struct tgl_message *M) {
     assert (json_object_set (res, "type", json_string ("notify_layer")) >= 0);
     assert (json_object_set (res, "layer", json_integer (M->action.layer)) >= 0);
     break;
-  case tgl_message_action_typing:
+  case tgl_message_action_typing:    
     assert (json_object_set (res, "type", json_string ("typing")) >= 0);
     assert (json_array_append (res, json_pack_typing (M->action.typing)) >= 0);
     break;
@@ -429,7 +429,7 @@ json_t *json_pack_service (struct tgl_message *M) {
   return res;
 }
 
-json_t *json_pack_message (struct tgl_message *M) {
+json_t *json_pack_message (struct tgl_message *M) {  
   json_t *res = json_object ();
   assert (json_object_set (res, "event", json_string ("message")) >= 0);
   //will overwriten to service, if service.
@@ -438,7 +438,7 @@ json_t *json_pack_message (struct tgl_message *M) {
   if (!(M->flags & TGLMF_CREATED)) { return res; }
 
   assert (json_object_set (res, "flags", json_integer (M->flags)) >= 0);
-
+ 
   if (tgl_get_peer_type (M->fwd_from_id)) {
     assert (json_object_set (res, "fwd_from", json_pack_peer (M->fwd_from_id)) >= 0);
     assert (json_object_set (res, "fwd_date", json_integer (M->fwd_date)) >= 0);
@@ -447,23 +447,23 @@ json_t *json_pack_message (struct tgl_message *M) {
   if (M->reply_id) {
     tgl_message_id_t msg_id = M->permanent_id;
     msg_id.id = M->reply_id;
-
+    
     assert (json_object_set (res, "reply_id", json_string (print_permanent_msg_id (msg_id))) >= 0);
   }
 
   if (M->flags & TGLMF_MENTION) {
     assert (json_object_set (res, "mention", json_true ()) >= 0);
   }
-
+ 
   assert (json_object_set (res, "from", json_pack_peer (M->from_id)) >= 0);
   assert (json_object_set (res, "to", json_pack_peer (M->to_id)) >= 0);
-
+  
   assert (json_object_set (res, "out", json_boolean (M->flags & TGLMF_OUT)) >= 0);
   assert (json_object_set (res, "unread", json_boolean (M->flags & TGLMF_UNREAD)) >= 0);
   assert (json_object_set (res, "service", json_boolean (M->flags & TGLMF_SERVICE)) >= 0);
   assert (json_object_set (res, "date", json_integer (M->date)) >= 0);
-
-  if (!(M->flags & TGLMF_SERVICE)) {
+  
+  if (!(M->flags & TGLMF_SERVICE)) {  
     if (M->message_len && M->message) {
       assert (json_object_set (res, "text", json_string (M->message)) >= 0);
     }
