@@ -305,14 +305,24 @@ void push_media (struct tgl_message_media *M) {
     lua_add_string_field ("caption", M->caption);
     break;
   case tgl_message_media_document:
-  case tgl_message_media_audio:
-  case tgl_message_media_video:
-  case tgl_message_media_document_encr:
     lua_newtable (luaState);
     lua_add_string_field ("type", "document");
-    lua_add_string_field ("caption", M->caption);
-    lua_add_string_field ("document_caption", M->document->caption);
-
+	lua_add_string_field ("caption", M->document->caption);
+	break;
+  case tgl_message_media_audio:
+    lua_newtable (luaState);
+    lua_add_string_field ("type", "audio");
+	lua_add_string_field ("caption", M->caption);
+	break;
+  case tgl_message_media_video:
+    lua_newtable (luaState);
+    lua_add_string_field ("type", "video");
+	lua_add_string_field ("caption", M->caption);
+	break;
+  case tgl_message_media_document_encr:
+    lua_newtable (luaState);
+    lua_add_string_field ("type", "encr_document");
+	lua_add_string_field ("caption", M->document->caption);
     break;
   case tgl_message_media_unsupported:
     lua_newtable (luaState);
@@ -504,10 +514,9 @@ void push_message (struct tgl_message *M) {
   lua_newtable (luaState);
 
   lua_add_string_field ("id", print_permanent_msg_id (M->permanent_id));
-  lua_add_num_field ("message_id", M->permanent_id.id);
-
+  lua_add_int_field ("temp_id", (M->temp_id));
   if (!(M->flags & TGLMF_CREATED)) { return; }
-  lua_add_num_field ("flags", M->flags);
+  lua_add_int_field ("flags", M->flags);
 
   if (tgl_get_peer_type (M->fwd_from_id)) {
     lua_pushstring (luaState, "fwd_from");
@@ -1329,7 +1338,7 @@ void lua_do_all (void) {
     case lq_load_audio:
     case lq_load_document:
       M = tgl_message_get (TLS, &lua_ptr[p + 1].msg_id);
-      if (!M || (M->media.type != tgl_message_media_photo && M->media.type != tgl_message_media_document && M->media.type != tgl_message_media_document_encr)) {
+      if (!M || (M->media.type != tgl_message_media_photo && M->media.type != tgl_message_media_document && M->media.type != tgl_message_media_video && M->media.type != tgl_message_media_audio && M->media.type != tgl_message_media_document_encr)) {
         lua_file_cb (TLS, lua_ptr[p].ptr, 0, 0);
       } else {
         if (M->media.type == tgl_message_media_photo) {
@@ -1338,6 +1347,12 @@ void lua_do_all (void) {
         } else if (M->media.type == tgl_message_media_document) {
           assert (M->media.document);
           tgl_do_load_document (TLS, M->media.document, lua_file_cb, lua_ptr[p].ptr);
+		} else if (M->media.type == tgl_message_media_video) {
+          assert (M->media.document);
+          tgl_do_load_audio (TLS, M->media.document, lua_file_cb, lua_ptr[p].ptr);
+		} else if (M->media.type == tgl_message_media_audio) {
+          assert (M->media.document);
+          tgl_do_load_audio (TLS, M->media.document, lua_file_cb, lua_ptr[p].ptr);
         } else {
           tgl_do_load_encr_document (TLS, M->media.encr_document, lua_file_cb, lua_ptr[p].ptr);
         }
@@ -1369,10 +1384,6 @@ void lua_do_all (void) {
       break;
     case lq_chat_info:
       tgl_do_get_chat_info (TLS, lua_ptr[p + 1].peer_id, 0, lua_chat_cb, lua_ptr[p].ptr);
-      p += 2;
-      break;
-    case lq_channel_info:
-      tgl_do_get_channel_info (TLS, lua_ptr[p + 1].peer_id, 0, lua_channel_cb, lua_ptr[p].ptr);
       p += 2;
       break;
     case lq_user_info:
@@ -1411,7 +1422,7 @@ void lua_do_all (void) {
       tgl_do_msg_search (TLS, tgl_set_peer_id (TGL_PEER_UNKNOWN, 0), 0, 0, 40, 0, LUA_STR_ARG (p + 1), lua_msg_list_cb, lua_ptr[p].ptr);
       p += 2;
       break;
-    case lq_resolve_username:
+	  case lq_resolve_username:
       tgl_do_contact_search (TLS, LUA_STR_ARG (p + 1), lua_contact_search_cb, lua_ptr[p].ptr);
       p += 2;
       break;
@@ -1423,12 +1434,12 @@ void lua_do_all (void) {
       tgl_do_set_profile_photo (TLS, lua_ptr[p + 1].str, lua_empty_cb, lua_ptr[p].ptr);
       p += 2;
       break;
-    case lq_set_profile_name:
-      tgl_do_set_profile_name (TLS, LUA_STR_ARG (p + 1), LUA_STR_ARG (p + 2), lua_user_cb, lua_ptr[p].ptr);
-      p += 3;
-      break;
     case lq_set_profile_username:
-      tgl_do_set_username (TLS, LUA_STR_ARG (p + 1), lua_user_cb, lua_ptr[p].ptr);
+      tgl_do_set_username (TLS, lua_ptr[p + 1].str, strlen(lua_ptr[p + 1].str), lua_user_cb, lua_ptr[p].ptr);
+      p += 2;
+      break;
+    case lq_set_profile_name:
+      tgl_do_set_profile_name (TLS, lua_ptr[p + 1].str,  strlen(lua_ptr[p + 1].str),lua_ptr[p + 2].str, strlen(lua_ptr[p + 2].str), lua_user_cb, lua_ptr[p].ptr);
       p += 3;
       break;
     case lq_create_secret_chat:
@@ -1491,6 +1502,10 @@ void lua_do_all (void) {
       tgl_do_create_channel (TLS, 1, &lua_ptr[p + 1].peer_id, LUA_STR_ARG (p + 2), LUA_STR_ARG (p + 3), 1,lua_empty_cb, lua_ptr[p].ptr);
       p += 4;
       break;
+    case lq_channel_info:
+      tgl_do_get_channel_info (TLS, lua_ptr[p + 1].peer_id, 0, lua_channel_cb, lua_ptr[p].ptr);
+      p += 2;
+      break;
     case lq_export_channel_link:
       tgl_do_export_channel_link (TLS, lua_ptr[p + 1].peer_id, lua_str_cb, lua_ptr[p].ptr);
       p += 2;
@@ -1512,19 +1527,19 @@ void lua_do_all (void) {
       p += 3;
       break;
     case lq_channel_get_admins:
-      tgl_do_channel_get_members (TLS, lua_ptr[p + 1].peer_id, 0, 0, 1, lua_contact_list_cb, lua_ptr[p].ptr);
+      tgl_do_channel_get_members (TLS, lua_ptr[p + 1].peer_id, 100, 0, 1, lua_contact_list_cb, lua_ptr[p].ptr);
       p += 2;
       break;
     case lq_channel_get_users:
-      tgl_do_channel_get_members (TLS, lua_ptr[p + 1].peer_id, 0, 0, 0, lua_contact_list_cb, lua_ptr[p].ptr);
+      tgl_do_channel_get_members (TLS, lua_ptr[p + 1].peer_id, 5000, 0, 0, lua_contact_list_cb, lua_ptr[p].ptr);
       p += 2;
       break;
     case lq_channel_get_bots:
-      tgl_do_channel_get_members (TLS, lua_ptr[p + 1].peer_id, 0, 0, 4, lua_contact_list_cb, lua_ptr[p].ptr);
+      tgl_do_channel_get_members (TLS, lua_ptr[p + 1].peer_id, 5000, 0, 4, lua_contact_list_cb, lua_ptr[p].ptr);
       p += 2;
       break;
     case lq_channel_get_kicked:
-      tgl_do_channel_get_members (TLS, lua_ptr[p + 1].peer_id, 0, 0, 3, lua_contact_list_cb, lua_ptr[p].ptr);
+      tgl_do_channel_get_members (TLS, lua_ptr[p + 1].peer_id, 5000, 0, 3, lua_contact_list_cb, lua_ptr[p].ptr);
       p += 2;
       break;
     //case lq_channel_unblock:
@@ -1666,6 +1681,7 @@ struct lua_function functions[] = {
   {"get_channels_dialog_list", lq_channels_dialog_list, { lfp_none }},
   {"chat_upgrade", lq_chat_upgrade, { lfp_peer, lfp_none }},
   {"create_channel", lq_create_channel, { lfp_peer, lfp_string, lfp_string, lfp_none }},
+  {"channel_info", lq_channel_info, { lfp_channel, lfp_none }},
   {"export_channel_link", lq_export_channel_link, { lfp_channel, lfp_none }},
   {"channel_invite", lq_channel_invite, { lfp_channel, lfp_user, lfp_none }},
   {"channel_join", lq_channel_join, { lfp_channel, lfp_none }},
