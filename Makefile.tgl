@@ -34,8 +34,8 @@ ${EXE}/generate: ${GENERATE_OBJECTS} ${TGL_COMMON_OBJECTS}
 ${AUTO}/scheme.tlo: ${AUTO}/scheme.tl ${EXE}/tl-parser
 	${EXE}/tl-parser -e $@ ${AUTO}/scheme.tl
 
-${AUTO}/scheme.tl: ${srcdir}/tgl/scheme.tl ${srcdir}/tgl/encrypted_scheme.tl ${srcdir}/tgl/binlog.tl ${srcdir}/tgl/append.tl ${srcdir}/tgl/mtproto.tl | ${AUTO}
-	cat $^ > $@
+${AUTO}/scheme.tl: ${srcdir}/tgl/scheme.tl ${srcdir}/tgl/encrypted_scheme.tl ${srcdir}/tgl/binlog.tl ${srcdir}/tgl/append.tl ${srcdir}/tgl/mtproto.tl ${srcdir}/tgl/calls.tl | ${AUTO}
+	python3 ${srcdir}/tgl/merge_tl.py $^ > $@
 
 ${AUTO}/scheme2.tl: ${AUTO}/scheme.tl ${EXE}/tl-parser
 	${EXE}/tl-parser -E ${AUTO}/scheme.tl 2> $@  || ( cat $@ && rm $@ && false )
