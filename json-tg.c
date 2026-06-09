@@ -123,16 +123,16 @@ json_t *json_pack_peer (tgl_peer_id_t id) {
     static char s[100];
     switch (tgl_get_peer_type (id)) {
     case TGL_PEER_USER:
-      sprintf (s, "user#%d", tgl_get_peer_id (id));
+      sprintf (s, "user#%lld", tgl_get_peer_id (id));
       break;
     case TGL_PEER_CHAT:
-      sprintf (s, "chat#%d", tgl_get_peer_id (id));
+      sprintf (s, "chat#%lld", tgl_get_peer_id (id));
       break;
     case TGL_PEER_CHANNEL:
-      sprintf (s, "channel#%d", tgl_get_peer_id (id));
+      sprintf (s, "channel#%lld", tgl_get_peer_id (id));
       break;
     case TGL_PEER_ENCR_CHAT:
-      sprintf (s, "encr_chat#%d", tgl_get_peer_id (id));
+      sprintf (s, "encr_chat#%lld", tgl_get_peer_id (id));
       break;
     default:
       assert (0);

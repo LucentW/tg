@@ -107,6 +107,14 @@ void lua_add_int_field (const char *name, double value) {
   lua_settable (luaState, -3);
 }
 
+void lua_add_int64_field (const char *name, long long value) {
+  assert (name && strlen (name));
+  my_lua_checkstack (luaState, 3);
+  lua_pushstring (luaState, name);
+  lua_pushinteger (luaState, (lua_Integer)value);
+  lua_settable (luaState, -3);
+}
+
 void push_tgl_peer_type (int x) {
   switch (x) {
   case TGL_PEER_USER:
@@ -247,26 +255,27 @@ void push_peer (tgl_peer_id_t id, tgl_peer_t *P) {
   lua_pushstring (luaState, "peer_type");
   push_tgl_peer_type (tgl_get_peer_type (id));
   lua_settable (luaState, -3);
-  lua_add_int_field ("peer_id", tgl_get_peer_id (id));
+  lua_add_int64_field ("peer_id", tgl_get_peer_id (id));
 
   if (!P || !(P->flags & TGLPF_CREATED)) {
     lua_pushstring (luaState, "print_name");
     static char s[100];
     switch (tgl_get_peer_type (id)) {
     case TGL_PEER_USER:
-      sprintf (s, "user#%d", tgl_get_peer_id (id));
+      sprintf (s, "user#%lld", tgl_get_peer_id (id));
       break;
     case TGL_PEER_CHAT:
-      sprintf (s, "chat#%d", tgl_get_peer_id (id));
+      sprintf (s, "chat#%lld", tgl_get_peer_id (id));
       break;
     case TGL_PEER_ENCR_CHAT:
-      sprintf (s, "encr_chat#%d", tgl_get_peer_id (id));
+      sprintf (s, "encr_chat#%lld", tgl_get_peer_id (id));
       break;
     case TGL_PEER_CHANNEL:
-      sprintf (s, "channel#%d", tgl_get_peer_id (id));
+      sprintf (s, "channel#%lld", tgl_get_peer_id (id));
       break;
     default:
-      assert (0);
+      sprintf (s, "unknown#%lld", tgl_get_peer_id (id));
+      break;
     }
     lua_pushstring (luaState, s);
     lua_settable (luaState, -3); // flags
@@ -291,7 +300,7 @@ void push_peer (tgl_peer_id_t id, tgl_peer_t *P) {
     push_channel (P);
     break;
   default:
-    assert (0);
+    break;
   }
 }
 
@@ -307,22 +316,52 @@ void push_media (struct tgl_message_media *M) {
   case tgl_message_media_document:
     lua_newtable (luaState);
     lua_add_string_field ("type", "document");
-	lua_add_string_field ("caption", M->document->caption);
-	break;
+    if (M->document) {
+      lua_add_string_field ("caption", M->document->caption);
+      lua_add_string_field ("mime_type", M->document->mime_type);
+      lua_add_int64_field ("id", M->document->id);
+      lua_add_int_field ("size", M->document->size);
+      if (M->document->duration) { lua_add_int_field ("duration", M->document->duration); }
+      if (M->document->w)        { lua_add_int_field ("width",    M->document->w); }
+      if (M->document->h)        { lua_add_int_field ("height",   M->document->h); }
+      if (M->document->flags & TGLDF_IMAGE)  { lua_add_string_field ("doc_type", "image"); }
+      else if (M->document->flags & TGLDF_VIDEO)  { lua_add_string_field ("doc_type", "video"); }
+      else if (M->document->flags & TGLDF_AUDIO)  { lua_add_string_field ("doc_type", "audio"); }
+      else if (M->document->flags & TGLDF_STICKER){ lua_add_string_field ("doc_type", "sticker"); }
+    }
+    break;
   case tgl_message_media_audio:
     lua_newtable (luaState);
     lua_add_string_field ("type", "audio");
-	lua_add_string_field ("caption", M->caption);
-	break;
+    if (M->document) {
+      lua_add_string_field ("mime_type", M->document->mime_type);
+      lua_add_int64_field ("id", M->document->id);
+      lua_add_int_field ("duration", M->document->duration);
+    }
+    break;
   case tgl_message_media_video:
     lua_newtable (luaState);
     lua_add_string_field ("type", "video");
-	lua_add_string_field ("caption", M->caption);
-	break;
+    if (M->document) {
+      lua_add_string_field ("caption", M->document->caption);
+      lua_add_string_field ("mime_type", M->document->mime_type);
+      lua_add_int64_field ("id", M->document->id);
+      lua_add_int_field ("size", M->document->size);
+      lua_add_int_field ("duration", M->document->duration);
+      lua_add_int_field ("width",    M->document->w);
+      lua_add_int_field ("height",   M->document->h);
+    }
+    break;
   case tgl_message_media_document_encr:
     lua_newtable (luaState);
     lua_add_string_field ("type", "encr_document");
-	lua_add_string_field ("caption", M->document->caption);
+    if (M->encr_document) {
+      lua_add_string_field ("mime_type", M->encr_document->mime_type);
+      lua_add_int_field ("size", M->encr_document->size);
+      if (M->encr_document->duration) { lua_add_int_field ("duration", M->encr_document->duration); }
+      if (M->encr_document->w)        { lua_add_int_field ("width",    M->encr_document->w); }
+      if (M->encr_document->h)        { lua_add_int_field ("height",   M->encr_document->h); }
+    }
     break;
   case tgl_message_media_unsupported:
     lua_newtable (luaState);
@@ -360,8 +399,14 @@ void push_media (struct tgl_message_media *M) {
     lua_add_string_field ("provider", M->venue.provider);
     lua_add_string_field ("venue_id", M->venue.venue_id);
     break;
+  case tgl_message_media_game:
+    lua_newtable (luaState);
+    lua_add_string_field ("type", "game");
+    break;
   default:
-    lua_pushstring (luaState, "???");
+    lua_newtable (luaState);
+    lua_add_string_field ("type", "unsupported");
+    break;
   }
 }
 
@@ -503,7 +548,8 @@ void push_service (struct tgl_message *M) {
     lua_add_string_field ("type", "migrated_from");
     break;
   default:
-    lua_pushstring (luaState, "???");
+    lua_newtable (luaState);
+    lua_add_string_field ("type", "unknown");
     break;
   }
 }
@@ -567,6 +613,37 @@ void push_message (struct tgl_message *M) {
     if (M->message_len && M->message) {
       lua_pushstring (luaState, "text");
       lua_pushlstring (luaState, M->message, M->message_len);
+      lua_settable (luaState, -3);
+    }
+    if (M->entities_num > 0 && M->entities) {
+      lua_pushstring (luaState, "entities");
+      lua_newtable (luaState);
+      int ei;
+      for (ei = 0; ei < M->entities_num; ei++) {
+        struct tgl_message_entity *E = &M->entities[ei];
+        lua_pushinteger (luaState, ei + 1);
+        lua_newtable (luaState);
+        lua_add_int_field ("offset", E->start);
+        lua_add_int_field ("length", E->length);
+        const char *etype = "unknown";
+        switch (E->type) {
+        case tgl_message_entity_mention:      etype = "mention";      break;
+        case tgl_message_entity_hashtag:      etype = "hashtag";      break;
+        case tgl_message_entity_bot_command:  etype = "bot_command";  break;
+        case tgl_message_entity_url:          etype = "url";          break;
+        case tgl_message_entity_email:        etype = "email";        break;
+        case tgl_message_entity_bold:         etype = "bold";         break;
+        case tgl_message_entity_italic:       etype = "italic";       break;
+        case tgl_message_entity_code:         etype = "code";         break;
+        case tgl_message_entity_pre:          etype = "pre";          break;
+        case tgl_message_entity_text_url:     etype = "text_url";     break;
+        case tgl_message_entity_mention_name: etype = "mention_name"; break;
+        default: break;
+        }
+        lua_add_string_field ("type", etype);
+        if (E->extra) { lua_add_string_field ("url", E->extra); }
+        lua_settable (luaState, -3);
+      }
       lua_settable (luaState, -3);
     }
     if (M->media.type && M->media.type != tgl_message_media_none) {

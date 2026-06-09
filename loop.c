@@ -486,7 +486,7 @@ void write_auth_file (void) {
 
   tgl_dc_iterator_ex (TLS, write_dc, &auth_file_fd);
 
-  assert (write (auth_file_fd, &TLS->our_id.peer_id, 4) == 4);
+  assert (write (auth_file_fd, &TLS->our_id.peer_id, 8) == 8);
   close (auth_file_fd);
 }
 
@@ -498,7 +498,7 @@ void write_secret_chat (tgl_peer_t *Peer, void *extra) {
   int fd = a[0];
   a[1] ++;
 
-  int id = tgl_get_peer_id (P->id);
+  int id = (int)tgl_get_peer_id (P->id);
   assert (write (fd, &id, 4) == 4);
   //assert (write (fd, &P->flags, 4) == 4);
   int l = strlen (P->print_name);
@@ -607,9 +607,12 @@ void read_auth_file (void) {
     }
   }
   bl_do_set_working_dc (TLS, dc_working_num);
-  int our_id;
-  int l = read (auth_file_fd, &our_id, 4);
-  if (l < 4) {
+  long long our_id = 0;
+  int l = read (auth_file_fd, &our_id, 8);
+  if (l == 4) {
+    /* old auth file stores our_id as 4-byte int — zero-extend */
+    our_id = (long long)(*(int *)&our_id);
+  } else if (l < 8) {
     assert (!l);
   }
   if (our_id) {
