@@ -2686,6 +2686,12 @@ void print_channel_info_gw (struct tgl_state *TLSR, void *extra, int success, st
     mprintf (ev, " (#%lld):\n", tgl_get_peer_id (U->id));
     mprintf (ev, "\tabout: %s\n", C->about);
     mprintf (ev, "\t%d participants, %d admins, %d kicked\n", C->participants_count, C->admins_count, C->kicked_count);
+    if (C->linked_chat_id) {
+      tgl_peer_id_t lp = TGL_MK_CHANNEL (C->linked_chat_id);
+      mprintf (ev, "\tlinked: ");
+      print_channel_name (ev, lp, tgl_peer_get (TLS, lp));
+      mprintf (ev, " (#%lld)\n", C->linked_chat_id);
+    }
     mpop_color (ev);
   } else {
     #ifdef USE_JSON

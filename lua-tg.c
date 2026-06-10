@@ -190,6 +190,12 @@ void push_channel (tgl_peer_t *P) {
   lua_pushstring (luaState, "megagroup");
   lua_pushboolean (luaState, P->flags & TGLCHF_MEGAGROUP);
   lua_settable (luaState, -3);
+  if (P->channel.linked_chat_id) {
+    tgl_peer_id_t lp = TGL_MK_CHANNEL (P->channel.linked_chat_id);
+    lua_pushstring (luaState, "linked_chat");
+    push_peer (lp, tgl_peer_get (TLS, lp));
+    lua_settable (luaState, -3);
+  }
 }
 
 void push_update_types (unsigned flags) {
