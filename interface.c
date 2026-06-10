@@ -2745,6 +2745,9 @@ void print_user_info_gw (struct tgl_state *TLSR, void *extra, int success, struc
     mprintf (ev, "\t");
     print_user_status (&U->status, ev);
     mprintf (ev, "\n");
+    if (U->about) {
+      mprintf (ev, "\tabout: %s\n", U->about);
+    }
 
     if (U->bot_info) {
       mprintf (ev, "\tshare_text:  %s\n", U->bot_info->share_text);
