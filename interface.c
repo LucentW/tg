@@ -1981,12 +1981,12 @@ int complete_spec_message_answer (struct tgl_message *M, int index, const char *
   index ++;
 
   int total = M->reply_markup->row_start[M->reply_markup->rows];
-  while (index < total && strncmp (M->reply_markup->buttons[index], text, len)) {
+  while (index < total && strncmp (M->reply_markup->buttons[index].text, text, len)) {
     index ++;
   }
-  
+
   if (index < total) {
-    *R = strdup (M->reply_markup->buttons[index]);
+    *R = strdup (M->reply_markup->buttons[index].text);
     assert (*R);
     return index;
   } else {
@@ -4446,7 +4446,25 @@ void print_message (struct in_ev *ev, struct tgl_message *M) {
     msg_id.id = M->reply_id;
     struct tgl_message *N = tgl_message_get (TLS, &msg_id);
     print_msg_id (ev, msg_id, N);
+    if (tgl_get_peer_type (M->reply_to_peer_id) > 0) {
+      mprintf (ev, " in ");
+      print_peer_name (ev, M->reply_to_peer_id, tgl_peer_get (TLS, M->reply_to_peer_id));
+    }
     mprintf (ev, "] ");
+  }
+  if (M->reply_markup && M->reply_markup->rows > 0) {
+    int btn;
+    int total = M->reply_markup->row_start[M->reply_markup->rows];
+    for (btn = 0; btn < total; btn++) {
+      struct tgl_keyboard_button *B = &M->reply_markup->buttons[btn];
+      mprintf (ev, "[btn:%s", B->text ? B->text : "");
+      if (B->type == TGL_KB_BUTTON_URL && B->url) {
+        mprintf (ev, " url=%s", B->url);
+      } else if (B->type == TGL_KB_BUTTON_CALLBACK) {
+        mprintf (ev, " cb");
+      }
+      mprintf (ev, "] ");
+    }
   }
   if (M->flags & TGLMF_MENTION) {
     mprintf (ev, "[mention] ");

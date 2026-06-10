@@ -578,6 +578,12 @@ void push_message (struct tgl_message *M) {
     msg_id.id = M->reply_id;
 
     lua_add_string_field ("reply_id", print_permanent_msg_id (msg_id));
+
+    if (tgl_get_peer_type (M->reply_to_peer_id) > 0) {
+      lua_pushstring (luaState, "reply_to_peer");
+      push_peer (M->reply_to_peer_id, tgl_peer_get (TLS, M->reply_to_peer_id));
+      lua_settable (luaState, -3);
+    }
   }
 
   if (M->flags & TGLMF_MENTION) {
@@ -650,6 +656,38 @@ void push_message (struct tgl_message *M) {
     if (M->media.type && M->media.type != tgl_message_media_none) {
       lua_pushstring (luaState, "media");
       push_media (&M->media);
+      lua_settable (luaState, -3);
+    }
+    if (M->reply_markup && M->reply_markup->rows > 0) {
+      lua_pushstring (luaState, "reply_markup");
+      lua_newtable (luaState);
+      int row;
+      for (row = 0; row < M->reply_markup->rows; row++) {
+        lua_pushinteger (luaState, row + 1);
+        lua_newtable (luaState);
+        int start = M->reply_markup->row_start[row];
+        int end   = M->reply_markup->row_start[row + 1];
+        int col = 1;
+        int btn;
+        for (btn = start; btn < end; btn++) {
+          struct tgl_keyboard_button *B = &M->reply_markup->buttons[btn];
+          lua_pushinteger (luaState, col++);
+          lua_newtable (luaState);
+          lua_add_string_field ("text", B->text ? B->text : "");
+          const char *btype = "text";
+          if (B->type == TGL_KB_BUTTON_URL)      { btype = "url"; }
+          else if (B->type == TGL_KB_BUTTON_CALLBACK) { btype = "callback"; }
+          lua_add_string_field ("type", btype);
+          if (B->url) { lua_add_string_field ("url", B->url); }
+          if (B->data && B->data_len > 0) {
+            lua_pushstring (luaState, "data");
+            lua_pushlstring (luaState, B->data, B->data_len);
+            lua_settable (luaState, -3);
+          }
+          lua_settable (luaState, -3);
+        }
+        lua_settable (luaState, -3);
+      }
       lua_settable (luaState, -3);
     }
   } else {
