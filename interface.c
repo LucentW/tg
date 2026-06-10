@@ -3090,6 +3090,30 @@ void print_message_gw (struct tgl_state *TLSR, struct tgl_message *M) {
   #endif  
 }
 
+void print_edit_message_gw (struct tgl_state *TLSR, struct tgl_message *M) {
+  assert (TLSR == TLS);
+  if (!binlog_read) { return; }
+  if (disable_output && !notify_ev) { return; }
+  struct in_ev *ev = notify_ev;
+  mprint_start (ev);
+  if (!enable_json) {
+    mprintf (ev, "[edited] ");
+    print_message (ev, M);
+  } else {
+    #ifdef USE_JSON
+      json_t *res = json_pack_message (M);
+      char *s = json_dumps (res, 0);
+      mprintf (ev, "%s\n", s);
+      json_decref (res);
+      free (s);
+    #endif
+  }
+  mprint_end (ev);
+  #ifdef USE_LUA
+    lua_edit_msg (M);
+  #endif
+}
+
 void our_id_gw (struct tgl_state *TLSR, tgl_peer_id_t id) {
   assert (TLSR == TLS);
   #ifdef USE_LUA
@@ -3424,6 +3448,7 @@ struct tgl_update_callback upd_cb = {
   .secret_chat_update = secret_chat_update_gw,
   .channel_update = channel_update_gw,
   .msg_receive = print_message_gw,
+  .edit_msg = print_edit_message_gw,
   .our_id = our_id_gw,
   .user_status_update = user_status_upd,
   .on_failed_login = on_failed_login

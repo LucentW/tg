@@ -622,6 +622,12 @@ void push_message (struct tgl_message *M) {
   lua_pushboolean (luaState, (M->flags & TGLMF_SERVICE) != 0);
   lua_settable (luaState, -3);
 
+  if (M->flags & TGLMF_EDITED) {
+    lua_pushstring (luaState, "edited");
+    lua_pushboolean (luaState, 1);
+    lua_settable (luaState, -3);
+  }
+
   if (!(M->flags & TGLMF_SERVICE)) {
     if (M->message_len && M->message) {
       lua_pushstring (luaState, "text");
@@ -756,7 +762,20 @@ void lua_our_id (tgl_peer_id_t id) {
 void lua_new_msg (struct tgl_message *M) {
   if (!have_file) { return; }
   lua_settop (luaState, 0);
-  //lua_checkstack (luaState, 20);
+  my_lua_checkstack (luaState, 20);
+  lua_getglobal (luaState, "on_msg_receive");
+  push_message (M);
+  assert (lua_gettop (luaState) == 2);
+
+  int r = ps_lua_pcall (luaState, 1, 0, 0);
+  if (r) {
+    logprintf ("lua: %s\n",  lua_tostring (luaState, -1));
+  }
+}
+
+void lua_edit_msg (struct tgl_message *M) {
+  if (!have_file) { return; }
+  lua_settop (luaState, 0);
   my_lua_checkstack (luaState, 20);
   lua_getglobal (luaState, "on_msg_receive");
   push_message (M);
