@@ -513,9 +513,9 @@ tgl_peer_id_t parse_input_peer_id (const char *s, int l, int mask) {
   for (i = 0; i < 8; i++) if (!mask || mask == tt[i]) {
     int x = strlen (ss[i]);
     if (l > x && !memcmp (s, ss[i], x)) {
-      int r = atoi (sc + x);
+      long long r = atoll (sc + x);
       tfree_str (sc);
-      if (r < 0) { return TGL_PEER_NOT_FOUND; }
+      if (r <= 0) { return TGL_PEER_NOT_FOUND; }
       tgl_peer_t *P = tgl_peer_get (TLS, tgl_set_peer_id (tt[i], r));
       if (!P) { return TGL_PEER_NOT_FOUND; }
       return P->id;
