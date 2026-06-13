@@ -25,6 +25,7 @@
 void lua_init (const char *file);
 void lua_new_msg (struct tgl_message *M);
 void lua_edit_msg (struct tgl_message *M);
+void lua_msg_reactions (tgl_peer_id_t peer_id, int msg_id, int reactions_num, struct tgl_reaction *reactions);
 void lua_our_id (tgl_peer_id_t id);
 void lua_secret_chat_update (struct tgl_secret_chat *U, unsigned flags);
 void lua_user_update (struct tgl_user *U, unsigned flags);

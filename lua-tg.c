@@ -787,6 +787,45 @@ void lua_edit_msg (struct tgl_message *M) {
   }
 }
 
+void lua_msg_reactions (tgl_peer_id_t peer_id, int msg_id, int reactions_num, struct tgl_reaction *reactions) {
+  if (!have_file) { return; }
+  lua_settop (luaState, 0);
+  my_lua_checkstack (luaState, 20);
+  lua_getglobal (luaState, "on_msg_reactions");
+  if (!lua_isfunction (luaState, -1)) { lua_settop (luaState, 0); return; }
+  push_peer (peer_id, tgl_peer_get (TLS, peer_id));
+  lua_pushnumber (luaState, msg_id);
+  lua_newtable (luaState);
+  for (int i = 0; i < reactions_num; i++) {
+    lua_newtable (luaState);
+    switch (reactions[i].type) {
+      case TGL_REACTION_EMOJI:
+        lua_pushstring (luaState, "type"); lua_pushstring (luaState, "emoji"); lua_settable (luaState, -3);
+        if (reactions[i].emoji) {
+          lua_pushstring (luaState, "emoji"); lua_pushstring (luaState, reactions[i].emoji); lua_settable (luaState, -3);
+        }
+        break;
+      case TGL_REACTION_CUSTOM:
+        lua_pushstring (luaState, "type"); lua_pushstring (luaState, "custom"); lua_settable (luaState, -3);
+        lua_pushstring (luaState, "doc_id"); lua_pushnumber (luaState, (double)reactions[i].doc_id); lua_settable (luaState, -3);
+        break;
+      case TGL_REACTION_PAID:
+        lua_pushstring (luaState, "type"); lua_pushstring (luaState, "paid"); lua_settable (luaState, -3);
+        break;
+    }
+    lua_pushstring (luaState, "count"); lua_pushnumber (luaState, reactions[i].count); lua_settable (luaState, -3);
+    if (reactions[i].chosen) {
+      lua_pushstring (luaState, "chosen"); lua_pushboolean (luaState, 1); lua_settable (luaState, -3);
+    }
+    lua_rawseti (luaState, -2, i + 1);
+  }
+  assert (lua_gettop (luaState) == 4);
+  int r = ps_lua_pcall (luaState, 3, 0, 0);
+  if (r) {
+    logprintf ("lua: %s\n", lua_tostring (luaState, -1));
+  }
+}
+
 void lua_secret_chat_update (struct tgl_secret_chat *C, unsigned flags) {
   if (!have_file) { return; }
   lua_settop (luaState, 0);

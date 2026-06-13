@@ -3114,6 +3114,35 @@ void print_edit_message_gw (struct tgl_state *TLSR, struct tgl_message *M) {
   #endif
 }
 
+void print_msg_reactions_gw (struct tgl_state *TLSR, tgl_peer_id_t peer_id, int msg_id, int reactions_num, struct tgl_reaction *reactions) {
+  assert (TLSR == TLS);
+  if (!binlog_read) { return; }
+  if (disable_output && !notify_ev) { return; }
+  struct in_ev *ev = notify_ev;
+  if (!enable_json) {
+    mprint_start (ev);
+    mprintf (ev, "[reactions] %s/%d:", print_permanent_peer_id (peer_id), msg_id);
+    for (int i = 0; i < reactions_num; i++) {
+      switch (reactions[i].type) {
+        case TGL_REACTION_EMOJI:
+          mprintf (ev, " %s×%d%s", reactions[i].emoji ? reactions[i].emoji : "?", reactions[i].count, reactions[i].chosen ? "*" : "");
+          break;
+        case TGL_REACTION_CUSTOM:
+          mprintf (ev, " [custom]×%d%s", reactions[i].count, reactions[i].chosen ? "*" : "");
+          break;
+        case TGL_REACTION_PAID:
+          mprintf (ev, " ⭐×%d%s", reactions[i].count, reactions[i].chosen ? "*" : "");
+          break;
+      }
+    }
+    mprintf (ev, "\n");
+    mprint_end (ev);
+  }
+  #ifdef USE_LUA
+    lua_msg_reactions (peer_id, msg_id, reactions_num, reactions);
+  #endif
+}
+
 void our_id_gw (struct tgl_state *TLSR, tgl_peer_id_t id) {
   assert (TLSR == TLS);
   #ifdef USE_LUA
@@ -3449,6 +3478,7 @@ struct tgl_update_callback upd_cb = {
   .channel_update = channel_update_gw,
   .msg_receive = print_message_gw,
   .edit_msg = print_edit_message_gw,
+  .msg_reactions = print_msg_reactions_gw,
   .our_id = our_id_gw,
   .user_status_update = user_status_upd,
   .on_failed_login = on_failed_login
