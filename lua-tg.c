@@ -984,7 +984,8 @@ enum lua_query_type {
   lq_channel_set_username,
   lq_channel_set_admin,
   lq_channel_set_mod,
-  lq_channel_demote
+  lq_channel_demote,
+  lq_send_reaction
 };
 
 struct lua_query_extra {
@@ -1634,6 +1635,10 @@ void lua_do_all (void) {
       tgl_do_delete_msg (TLS, &lua_ptr[p + 1].msg_id, lua_empty_cb, lua_ptr[p].ptr);
       p += 2;
       break;
+    case lq_send_reaction:
+      tgl_do_send_reaction (TLS, &lua_ptr[p + 1].msg_id, lua_ptr[p + 2].str, lua_empty_cb, lua_ptr[p].ptr);
+      p += 3;
+      break;
     case lq_get_message:
       tgl_do_get_message (TLS, &lua_ptr[p + 1].msg_id, lua_msg_cb, lua_ptr[p].ptr);
       p += 2;
@@ -1848,6 +1853,7 @@ struct lua_function functions[] = {
   {"create_secret_chat", lq_create_secret_chat, { lfp_user, lfp_none }},
   {"create_group_chat", lq_create_group_chat, { lfp_user, lfp_string, lfp_none }},
   {"delete_msg", lq_delete_msg, { lfp_msg, lfp_none }},
+  {"send_reaction", lq_send_reaction, { lfp_msg, lfp_string, lfp_none }},
   {"restore_msg", lq_restore_msg, { lfp_positive_number, lfp_none }},
   {"get_message", lq_get_message, { lfp_msg, lfp_none }},
   {"accept_secret_chat", lq_accept_secret_chat, { lfp_secret_chat, lfp_none }},
