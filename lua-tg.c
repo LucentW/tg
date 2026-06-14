@@ -993,6 +993,12 @@ struct lua_query_extra {
   int param;
 };
 
+struct send_reaction_extra {
+  tgl_message_id_t msg_id;
+  char **emojis;
+  int count;
+};
+
 void lua_empty_cb (struct tgl_state *TLSR, void *cb_extra, int success) {
   assert (TLSR == TLS);
   struct lua_query_extra *cb = cb_extra;
@@ -1636,8 +1642,15 @@ void lua_do_all (void) {
       p += 2;
       break;
     case lq_send_reaction:
-      tgl_do_send_reaction (TLS, &lua_ptr[p + 1].msg_id, lua_ptr[p + 2].str, lua_empty_cb, lua_ptr[p].ptr);
-      p += 3;
+      {
+        struct send_reaction_extra *SR = lua_ptr[p + 1].ptr;
+        tgl_do_send_reaction (TLS, &SR->msg_id, (const char **)SR->emojis, SR->count, lua_empty_cb, lua_ptr[p].ptr);
+        for (int i = 0; i < SR->count; i++) { tfree_str (SR->emojis[i]); }
+        if (SR->count) { tfree (SR->emojis, SR->count * sizeof (char *)); }
+        tfree (SR, sizeof (*SR));
+        lua_ptr[p + 1].flags = 0; /* don't double-free via the flags&1 path */
+        p += 2;
+      }
       break;
     case lq_get_message:
       tgl_do_get_message (TLS, &lua_ptr[p + 1].msg_id, lua_msg_cb, lua_ptr[p].ptr);
@@ -1853,7 +1866,6 @@ struct lua_function functions[] = {
   {"create_secret_chat", lq_create_secret_chat, { lfp_user, lfp_none }},
   {"create_group_chat", lq_create_group_chat, { lfp_user, lfp_string, lfp_none }},
   {"delete_msg", lq_delete_msg, { lfp_msg, lfp_none }},
-  {"send_reaction", lq_send_reaction, { lfp_msg, lfp_string, lfp_none }},
   {"restore_msg", lq_restore_msg, { lfp_positive_number, lfp_none }},
   {"get_message", lq_get_message, { lfp_msg, lfp_none }},
   {"accept_secret_chat", lq_accept_secret_chat, { lfp_secret_chat, lfp_none }},
@@ -2123,6 +2135,67 @@ static int universal_from_lua (lua_State *L) {
 }
 
 
+static int send_reaction_from_lua (lua_State *L) {
+  /* args: msg_id_str, emoji_or_table, callback, cb_param */
+  if (lua_gettop (L) != 4) { lua_pushboolean (L, 0); return 1; }
+
+  int a1 = luaL_ref (L, LUA_REGISTRYINDEX); /* cb_param */
+  int a2 = luaL_ref (L, LUA_REGISTRYINDEX); /* callback */
+
+  struct lua_query_extra *e = malloc (sizeof (*e));
+  assert (e);
+  e->func = a2;
+  e->param = a1;
+
+  assert (pos + 4 < MAX_LUA_COMMANDS);
+
+  /* parse msg_id (arg 1) */
+  const char *msg_str = lua_tostring (L, 1);
+  tgl_message_id_t mid = {0};
+  if (msg_str) { mid = parse_input_msg_id (msg_str, strlen (msg_str)); }
+  if (!mid.peer_type) {
+    luaL_unref (luaState, LUA_REGISTRYINDEX, a1);
+    luaL_unref (luaState, LUA_REGISTRYINDEX, a2);
+    free (e);
+    lua_pushboolean (L, 0);
+    return 1;
+  }
+
+  /* parse emojis (arg 2): string → single, table → list, "" or {} → remove all */
+  struct send_reaction_extra *SR = talloc0 (sizeof (*SR));
+  SR->msg_id = mid;
+
+  if (lua_isstring (L, 2)) {
+    const char *s = lua_tostring (L, 2);
+    if (s && *s) {
+      SR->emojis = talloc (sizeof (char *));
+      SR->emojis[0] = tstrdup (s);
+      SR->count = 1;
+    }
+  } else if (lua_istable (L, 2)) {
+    int n = (int)lua_rawlen (L, 2);
+    if (n > 0) {
+      SR->emojis = talloc (n * sizeof (char *));
+      for (int i = 1; i <= n; i++) {
+        lua_rawgeti (L, 2, i);
+        const char *s = lua_tostring (L, -1);
+        lua_pop (L, 1);
+        if (s && *s) { SR->emojis[SR->count++] = tstrdup (s); }
+      }
+      if (!SR->count) { tfree (SR->emojis, n * sizeof (char *)); SR->emojis = NULL; }
+    }
+  }
+
+  /* layout: [l=2][f=lq_send_reaction][e][SR] */
+  lua_ptr[pos].num = 2;              lua_ptr[pos++].flags = 0;
+  lua_ptr[pos].num = lq_send_reaction; lua_ptr[pos++].flags = 0;
+  lua_ptr[pos].ptr = e;              lua_ptr[pos++].flags = 0;
+  lua_ptr[pos].ptr = SR;             lua_ptr[pos++].flags = 0;
+
+  lua_pushboolean (L, 1);
+  return 1;
+}
+
 static void my_lua_register (lua_State *L, const char *name, lua_CFunction f) {
   lua_pushstring(L, name);
   lua_pushcclosure(L, f, 1);
@@ -2343,6 +2416,7 @@ void lua_init (const char *file) {
   lua_register (luaState, "postpone", postpone_from_lua);
   lua_register (luaState, "safe_quit", safe_quit_from_lua);
   lua_register (luaState, "register_interface_function", register_interface_from_lua);
+  lua_register (luaState, "send_reaction", send_reaction_from_lua);
 
   print_start ();
   int r = luaL_dofile (luaState, file);
